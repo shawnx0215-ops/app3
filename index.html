@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>电商长图裁剪工具 Pro</title>
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 React 和 ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- 引入 Babel 用于解析 JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <style>
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(30, 41, 59, 0.3); border-radius: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(71, 85, 105, 0.6); border-radius: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(100, 116, 139, 0.8); }
+        body { margin: 0; overflow: hidden; background-color: #0f172a; color: white; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useRef, useEffect, useCallback } = React;
+
+        // --- 图标组件 (SVG) ---
+        const IconWrapper = ({ children, className, ...props }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+                {children}
+            </svg>
+        );
+        const Scissors = (p) => <IconWrapper {...p}><circle cx="6" cy="6" r="3"/><path d="M8.12 8.12 12 12"/><path d="M20 4 8.12 15.88"/><circle cx="6" cy="18" r="3"/><path d="M14.8 14.8 20 20"/></IconWrapper>;
+        const Upload = (p) => <IconWrapper {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></IconWrapper>;
+        const Trash2 = (p) => <IconWrapper {...p}><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></IconWrapper>;
+        const Plus = (p) => <IconWrapper {...p}><path d="M5 12h14"/><path d="M12 5v14"/></IconWrapper>;
+        const Minus = (p) => <IconWrapper {...p}><path d="M5 12h14"/></IconWrapper>;
+        const MoveVertical = (p) => <IconWrapper {...p}><path d="M8 18L12 22L16 18"/><path d="M8 6L12 2L16 6"/><line x1="12" x2="12" y1="2" y2="22"/></IconWrapper>;
+        const RefreshCcw = (p) => <IconWrapper {...p}><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></IconWrapper>;
+        const ImageIcon = (p) => <IconWrapper {...p}><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></IconWrapper>;
+        const Layers = (p) => <IconWrapper {...p}><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></IconWrapper>;
+        const ZoomIn = (p) => <IconWrapper {...p}><circle cx="11" cy="11" r="8"/><line x1="21" x2="16.65" y1="21" y2="16.65"/><line x1="11" x2="11" y1="8" y2="14"/><line x1="8" x2="14" y1="11" y2="11"/></IconWrapper>;
+        const ZoomOut = (p) => <IconWrapper {...p}><circle cx="11" cy="11" r="8"/><line x1="21" x2="16.65" y1="21" y2="16.65"/><line x1="8" x2="14" y1="11" y2="11"/></IconWrapper>;
+        const Package = (p) => <IconWrapper {...p}><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22v-9"/></IconWrapper>;
+        const Loader2 = (p) => <IconWrapper {...p}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></IconWrapper>;
+        const Eraser = (p) => <IconWrapper {...p}><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></IconWrapper>;
+
+
+        // --- 主应用逻辑 ---
+        const App = () => {
+          const [imageSrc, setImageSrc] = useState(null);
+          const [naturalDimensions, setNaturalDimensions] = useState({ width: 0, height: 0 });
+          const [cutLines, setCutLines] = useState([]); 
+          const [isDragging, setIsDragging] = useState(null); 
+          const [splitCount, setSplitCount] = useState(5);
+          const [hoverY, setHoverY] = useState(null);
+          const [scale, setScale] = useState(1.0);
+          const [zipFilename, setZipFilename] = useState('电商切图');
+          const [isZipping, setIsZipping] = useState(false);
+          const [libsLoaded, setLibsLoaded] = useState(false);
+
+          const imgContainerRef = useRef(null);
+          const imgRef = useRef(null);
+
+          // 动态加载 JSZip 和 FileSaver
+          useEffect(() => {
+            const loadScript = (src) => {
+              return new Promise((resolve, reject) => {
+                if (document.querySelector(`script[src="${src}"]`)) {
+                  resolve(); return;
+                }
+                const script = document.createElement('script');
+                script.src = src;
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+              });
+            };
+
+            Promise.all([
+              loadScript('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'),
+              loadScript('https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js')
+            ]).then(() => {
+              console.log('Libs loaded');
+              setLibsLoaded(true);
+            }).catch(err => console.error('Failed to load libraries', err));
+          }, []);
+
+          const handleImageUpload = (e) => {
+            const file = e.target.files[0];
+            if (file) {
+              const nameWithoutExt = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
+              setZipFilename(nameWithoutExt + '_切图');
+              const reader = new FileReader();
+              reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => {
+                  setNaturalDimensions({ width: img.width, height: img.height });
+                  setImageSrc(event.target.result);
+                  setCutLines([]);
+                  setScale(1.0);
+                };
+                img.src = event.target.result;
+              };
+              reader.readAsDataURL(file);
+            }
+          };
+
+          const handleClear = () => {
+            setImageSrc(null);
+            setCutLines([]);
+            setNaturalDimensions({ width: 0, height: 0 });
+            setScale(1.0);
+            setZipFilename('电商切图');
+          };
+
+          const addCutLine = (percentage) => {
+            if (percentage <= 0 || percentage >= 100) return;
+            setCutLines(prev => [...prev, percentage].sort((a, b) => a - b));
+          };
+
+          const handleContainerClick = (e) => {
+            if (!imgContainerRef.current || isDragging !== null) return;
+            if (e.target.dataset.type === 'handle') return;
+            const rect = imgContainerRef.current.getBoundingClientRect();
+            const offsetY = e.clientY - rect.top;
+            const percentage = (offsetY / rect.height) * 100;
+            addCutLine(percentage);
+          };
+
+          const handleAutoSplit = () => {
+            if (!splitCount || splitCount < 2) return;
+            const step = 100 / splitCount;
+            const newLines = [];
+            for (let i = 1; i < splitCount; i++) {
+              newLines.push(step * i);
+            }
+            setCutLines(newLines);
+          };
+
+          const handleResetLines = () => {
+            if (cutLines.length > 0) setCutLines([]);
+          };
+
+          const handleLineMouseDown = (index, e) => {
+            e.stopPropagation();
+            setIsDragging(index);
+          };
+
+          const handleMouseMove = useCallback((e) => {
+            if (imgContainerRef.current) {
+              const rect = imgContainerRef.current.getBoundingClientRect();
+              const relativeY = e.clientY - rect.top;
+              const percentage = Math.max(0, Math.min(100, (relativeY / rect.height) * 100));
+              setHoverY(percentage);
+
+              if (isDragging !== null) {
+                setCutLines(prev => {
+                  const newLines = [...prev];
+                  newLines[isDragging] = percentage;
+                  return newLines.sort((a, b) => a - b);
+                });
+              }
+            }
+          }, [isDragging]);
+
+          const handleMouseUp = () => {
+            if (isDragging !== null) {
+              setIsDragging(null);
+              setCutLines(prev => [...prev].sort((a, b) => a - b));
+            }
+          };
+
+          const removeLine = (index, e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            setCutLines(prev => prev.filter((_, i) => i !== index));
+          };
+
+          const handleZipDownload = async () => {
+            if (!imageSrc || !imgRef.current || isZipping) return;
+            if (!libsLoaded || !window.JSZip || !window.saveAs) {
+                alert("打包组件正在加载中，请稍等 2-3 秒后再试...");
+                return;
+            }
+            setIsZipping(true);
+            try {
+                const zip = new window.JSZip();
+                const sortedLines = [...cutLines].sort((a, b) => a - b);
+                const splitPoints = [0, ...sortedLines, 100];
+                const originalImg = new Image();
+                originalImg.src = imageSrc;
+                await new Promise(r => originalImg.onload = r);
+
+                for (let i = 0; i < splitPoints.length - 1; i++) {
+                  const startPercent = splitPoints[i];
+                  const endPercent = splitPoints[i+1];
+                  const startY = (startPercent / 100) * naturalDimensions.height;
+                  const endY = (endPercent / 100) * naturalDimensions.height;
+                  const sectionHeight = endY - startY;
+                  if (sectionHeight < 1) continue;
+
+                  const canvas = document.createElement('canvas');
+                  canvas.width = naturalDimensions.width;
+                  canvas.height = sectionHeight;
+                  const ctx = canvas.getContext('2d');
+                  ctx.drawImage(originalImg, 0, startY, naturalDimensions.width, sectionHeight, 0, 0, naturalDimensions.width, sectionHeight);
+                  const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.95));
+                  const fileName = `slice_${String(i + 1).padStart(2, '0')}.jpg`;
+                  zip.file(fileName, blob);
+                }
+                const content = await zip.generateAsync({ type: 'blob' });
+                const finalFilename = (zipFilename.trim() || '切图打包') + '.zip';
+                window.saveAs(content, finalFilename);
+            } catch (error) {
+                console.error("导出失败:", error);
+                alert("导出 ZIP 失败，请重试。");
+            } finally {
+                setIsZipping(false);
+            }
+          };
+
+          const adjustScale = (delta) => setScale(prev => Math.min(Math.max(prev + delta, 0.2), 3.0));
+          const resetScale = () => setScale(1.0);
+
+          const getSliceInfo = () => {
+            const sorted = [0, ...cutLines, 100].sort((a, b) => a - b);
+            const infos = [];
+            for(let i=0; i<sorted.length-1; i++) {
+                const hPercent = sorted[i+1] - sorted[i];
+                const pxHeight = Math.round((hPercent/100) * naturalDimensions.height);
+                infos.push({ index: i+1, pxHeight });
+            }
+            return infos;
+          };
+
+          useEffect(() => {
+            if (isDragging !== null) {
+              window.addEventListener('mousemove', handleMouseMove);
+              window.addEventListener('mouseup', handleMouseUp);
+            }
+            return () => {
+              window.removeEventListener('mousemove', handleMouseMove);
+              window.removeEventListener('mouseup', handleMouseUp);
+            };
+          }, [isDragging, handleMouseMove]);
+
+          return (
+            <div className="min-h-screen bg-slate-900 text-slate-100 font-sans flex flex-col h-screen overflow-hidden">
+              {/* Header */}
+              <header className="bg-slate-800 border-b border-slate-700 p-4 flex items-center justify-between shrink-0 z-20 shadow-md">
+                <div className="flex items-center gap-2">
+                  <Scissors className="text-blue-400 w-6 h-6" />
+                  <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-teal-400 bg-clip-text text-transparent hidden md:block">
+                    电商长图切图神器 Pro (Web)
+                  </h1>
+                </div>
+                <div className="flex items-center gap-4">
+                    {imageSrc && (
+                        <>
+                            <div className="flex items-center gap-1 bg-slate-900/50 p-1 rounded-lg mr-2">
+                                <button onClick={() => adjustScale(-0.1)} className="p-1.5 hover:bg-slate-700 rounded text-slate-300 hover:text-white" title="缩小"><ZoomOut size={16}/></button>
+                                <span className="text-xs font-mono w-12 text-center">{Math.round(scale * 100)}%</span>
+                                <button onClick={() => adjustScale(0.1)} className="p-1.5 hover:bg-slate-700 rounded text-slate-300 hover:text-white" title="放大"><ZoomIn size={16}/></button>
+                                <div className="w-px h-4 bg-slate-700 mx-1"></div>
+                                <button onClick={resetScale} className="p-1.5 hover:bg-slate-700 rounded text-slate-300 hover:text-white" title="重置缩放"><RefreshCcw size={16}/></button>
+                            </div>
+                            <div className="hidden md:flex items-center gap-2 text-sm text-slate-400 bg-slate-900/50 px-3 py-1.5 rounded-full">
+                                <ImageIcon className="w-4 h-4" />
+                                <span>{naturalDimensions.width} x {naturalDimensions.height}</span>
+                                <span className="mx-1 opacity-50">|</span>
+                                <Layers className="w-4 h-4" />
+                                <span>{cutLines.length + 1}片</span>
+                            </div>
+                        </>
+                    )}
+                </div>
+              </header>
+
+              <main className="flex-1 flex overflow-hidden">
+                {/* Sidebar */}
+                <aside className="w-80 bg-slate-800 border-r border-slate-700 p-6 flex flex-col gap-6 overflow-y-auto shrink-0 z-10 shadow-xl">
+                  <div className="space-y-3">
+                    <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">第一步：导入</h2>
+                    {!imageSrc ? (
+                        <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-slate-600 rounded-lg cursor-pointer hover:border-blue-500 hover:bg-slate-700/50 transition-all group">
+                            <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                                <Upload className="w-8 h-8 mb-2 text-slate-500 group-hover:text-blue-400 transition-colors" />
+                                <p className="text-sm text-slate-400">点击或拖拽上传长图</p>
+                            </div>
+                            <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} />
+                        </label>
+                    ) : (
+                        <button onClick={handleClear} className="w-full flex items-center justify-center gap-2 py-2 px-4 bg-red-500/10 text-red-400 border border-red-500/20 rounded hover:bg-red-500/20 transition-all">
+                            <Trash2 className="w-4 h-4" /> 清除并重新上传
+                        </button>
+                    )}
+                  </div>
+
+                  {imageSrc && (
+                    <>
+                      <div className="space-y-3 pt-4 border-t border-slate-700">
+                        <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">第二步：分割</h2>
+                        <div className="bg-slate-700/30 p-4 rounded-lg space-y-4">
+                            <div className="flex flex-col gap-2">
+                                <label className="text-xs text-slate-400">均分数量 (Auto Split)</label>
+                                <div className="flex items-center gap-2">
+                                    <button onClick={() => setSplitCount(Math.max(2, splitCount - 1))} className="p-2 bg-slate-700 hover:bg-slate-600 rounded"><Minus className="w-4 h-4" /></button>
+                                    <input type="number" value={splitCount} onChange={(e) => setSplitCount(Number(e.target.value))} className="w-full bg-slate-900 border border-slate-600 rounded text-center py-1.5 focus:outline-none focus:border-blue-500 font-mono"/>
+                                    <button onClick={() => setSplitCount(splitCount + 1)} className="p-2 bg-slate-700 hover:bg-slate-600 rounded"><Plus className="w-4 h-4" /></button>
+                                </div>
+                            </div>
+                            <div className="flex flex-col gap-2">
+                                <button onClick={handleAutoSplit} className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white rounded font-medium flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-900/20">
+                                    <RefreshCcw className="w-4 h-4" /> 生成均分切线
+                                </button>
+                                {cutLines.length > 0 && (
+                                    <button onClick={handleResetLines} className="w-full py-2 bg-slate-800 hover:bg-red-900/20 text-slate-400 hover:text-red-400 border border-slate-600 hover:border-red-500/30 rounded font-medium flex items-center justify-center gap-2 transition-all" title="移除所有分割线，保留图片">
+                                        <Eraser className="w-4 h-4" /> 清空当前切线
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2 pt-4 border-t border-slate-700 flex-1 overflow-hidden flex flex-col">
+                         <div className="flex justify-between items-center">
+                            <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">切片预览</h2>
+                            <span className="text-xs text-slate-500">共 {cutLines.length + 1} 张</span>
+                         </div>
+                         <div className="overflow-y-auto pr-2 space-y-2 text-sm flex-1 custom-scrollbar py-2">
+                            {getSliceInfo().map((info, idx) => (
+                                <div key={info.index} className="flex justify-between items-center p-2.5 bg-slate-700/30 rounded-md border border-slate-700/50 hover:border-slate-600 transition-colors group relative overflow-hidden">
+                                    <div className="flex items-center gap-2 z-10">
+                                        <span className="bg-slate-600 text-slate-300 text-[10px] font-bold px-1.5 py-0.5 rounded">{String(info.index).padStart(2, '0')}</span>
+                                        <span className="text-slate-300">切片文件</span>
+                                    </div>
+                                    <span className="font-mono text-slate-400 text-xs z-10">{info.pxHeight}px 高</span>
+                                </div>
+                            ))}
+                         </div>
+                      </div>
+
+                      <div className="pt-4 border-t border-slate-700 mt-auto space-y-3">
+                        <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">第三步：导出</h2>
+                        <div className="flex flex-col gap-1">
+                            <label htmlFor="zipFilename" className="text-xs text-slate-500">ZIP 文件名 (不含后缀)</label>
+                            <div className="relative">
+                                <input id="zipFilename" type="text" value={zipFilename} onChange={(e) => setZipFilename(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded py-2 pl-3 pr-10 focus:outline-none focus:border-emerald-500 text-sm truncate" placeholder="输入文件名..."/>
+                                <span className="absolute right-3 top-2.5 text-slate-500 text-sm pointer-events-none">.zip</span>
+                            </div>
+                        </div>
+                        <button onClick={handleZipDownload} disabled={isZipping || !libsLoaded} className={`w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold flex items-center justify-center gap-2 text-lg shadow-lg shadow-emerald-900/20 transition-all ${isZipping || !libsLoaded ? 'opacity-70 cursor-not-allowed' : 'hover:translate-y-[-1px]'}`}>
+                            {isZipping ? (<><Loader2 className="w-5 h-5 animate-spin" />正在打包中...</>) : !libsLoaded ? (<><Loader2 className="w-5 h-5 animate-spin" />组件加载中...</>) : (<><Package className="w-5 h-5" />打包下载 ZIP</>)}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </aside>
+
+                {/* Workspace */}
+                <section className="flex-1 bg-slate-950 overflow-auto relative flex justify-center p-8 select-none custom-scrollbar" onMouseMove={imageSrc ? handleMouseMove : null} onMouseUp={handleMouseUp}>
+                  {!imageSrc && (
+                     <div className="self-center text-slate-600 flex flex-col items-center gap-4 select-none pointer-events-none">
+                         <div className="w-24 h-24 border-4 border-slate-800 rounded-2xl flex items-center justify-center bg-slate-900">
+                            <ImageIcon className="w-10 h-10 opacity-40" />
+                         </div>
+                         <p className="text-lg font-medium opacity-50">请在左侧上传图片开始工作</p>
+                     </div>
+                  )}
+                  {imageSrc && (
+                    <div ref={imgContainerRef} className="relative shadow-2xl ring-1 ring-slate-800 transition-transform duration-150 ease-out origin-top"
+                        style={{ width: 'min(100%, 600px)', height: 'fit-content', cursor: 'crosshair', transform: `scale(${scale})`, marginBottom: `${(scale - 1) * 100}px` }}
+                        onClick={handleContainerClick}
+                    >
+                      <img ref={imgRef} src={imageSrc} alt="Original" className="w-full block pointer-events-none select-none" draggable={false} />
+                      {cutLines.map((linePercent, index) => (
+                        <div key={index} className="absolute left-0 w-full group z-10 hover:z-50" style={{ top: `${linePercent}%`, height: '2px' }}>
+                            <div className="w-full h-full bg-red-500 shadow-[0_0_2px_rgba(0,0,0,0.5)] relative group-hover:bg-red-400 transition-colors">
+                                <div className="absolute left-0 -top-5 bg-red-600 text-white text-[9px] px-1.5 py-0.5 rounded-r shadow-sm font-bold tracking-wider opacity-80 group-hover:opacity-100">#{index + 1}</div>
+                                <div className="absolute right-0 -top-5 bg-slate-800 text-slate-300 text-[9px] px-1.5 py-0.5 rounded-l shadow-sm border border-slate-600 opacity-80 group-hover:opacity-100 font-mono">y:{Math.round((linePercent / 100) * naturalDimensions.height)}</div>
+                            </div>
+                            <div data-type="handle" className="absolute -top-3 left-0 w-full h-8 cursor-row-resize flex items-center justify-center group-hover:bg-red-500/10 transition-colors"
+                                onMouseDown={(e) => handleLineMouseDown(index, e)} onContextMenu={(e) => removeLine(index, e)}>
+                                <div className="w-6 h-3 bg-red-500 rounded-full flex items-center justify-center shadow-sm opacity-0 group-hover:opacity-100 transition-all scale-90 group-hover:scale-100"><MoveVertical className="w-2.5 h-2.5 text-white" /></div>
+                            </div>
+                        </div>
+                      ))}
+                      {isDragging === null && hoverY !== null && <div className="absolute left-0 w-full border-t border-dashed border-blue-400/50 pointer-events-none z-0" style={{ top: `${hoverY}%` }}></div>}
+                    </div>
+                  )}
+                </section>
+              </main>
+            </div>
+          );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
